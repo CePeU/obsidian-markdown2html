@@ -25,3 +25,11 @@ data.json
 
 # Exclude macOS Finder (System Explorer) View States
 .DS_Store
+dist
+package_oldpit.json
+src/utils.js
+src/settings.js
+src/plugin.js
+src/html-cleaner.js
+package.json
+package-lock.json

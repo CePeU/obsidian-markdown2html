@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "node esbuild.config.mjs",
     "build": "tsc -noEmit -skipLibCheck && node esbuild.config.mjs production",
+    "postbuild": "cp ma*.j* ./dist && chown -R nobody:sambashare ./dist/ma*.j* && chmod -R 777 ./dist/ma*.j*",
     "version": "node version-bump.mjs && git add manifest.json versions.json"
   },
   "keywords": [
