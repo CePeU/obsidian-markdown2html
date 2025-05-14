@@ -1,8 +1,11 @@
-import { App, Modal, debounce, ExtraButtonComponent, PluginSettingTab, Setting, TextComponent } from "obsidian";
+import { App, Modal, debounce, ExtraButtonComponent, PluginSettingTab, Setting, TextComponent, ButtonComponent } from "obsidian";
 import Markdown2Html from "src/plugin";
 import { isEmpty } from "./utils";
 import { isAsyncFunction } from "util/types";
 import { text } from "stream/consumers";
+import { debug, table } from "console";
+import { markAsUntransferable } from "worker_threads";
+import { validateHeaderName } from "http";
 
 
 export interface Markdown2HtmlSettings {
@@ -10,7 +13,7 @@ export interface Markdown2HtmlSettings {
 	classList: string[];
 	isActiveProfile: boolean;
 	exportCleaned: true;
-	rulesMap: Map<string, string>;
+	rulesArray: string[][];
 }
 
 export interface ProfileSettings  {
@@ -24,7 +27,7 @@ export const DEFAULT_SETTINGS: ProfileSettings = {
 	classList: [],
 	isActiveProfile: true,
 	exportCleaned: true,
-	rulesMap:new Map<string, string>([["div", "p"]]), 
+	rulesArray: [["div", "p"]], 
 }};
 
 //let _profileName :string = 'default';
@@ -161,7 +164,7 @@ export class Markdown2HtmlSettingsTab extends PluginSettingTab {
 		);
 
 		new Setting(containerEl)
-			.setName("Delete all Classes")
+			.setName("Reset classes to keep")
 			.setDesc(
 				`If you want a clean export just press this button.`
 			)
@@ -187,7 +190,8 @@ export class Markdown2HtmlSettingsTab extends PluginSettingTab {
 					})
 			);
 	
-		new Setting(containerEl).setHeading().setName("Classes/Attributes for HTML tags");
+	//Button for Modal and Class Mapping
+	new Setting(containerEl).setHeading().setName("Classes/Attributes for HTML tags");
 	new Setting(containerEl)
 			.setName("Add additional Classes/Attributes for HTML tags")
 			.setDesc(`This allows you to add Classes and Attributes to HTML tags during export. The rules set up here run as a last step in the export.`)
@@ -196,12 +200,46 @@ export class Markdown2HtmlSettingsTab extends PluginSettingTab {
 					.setIcon("list-plus")
 					.setTooltip("Add classes according to rules")
 					.onClick(() => {
-						new RulesModal(this.app).open();
-						console.log("==> New Modal and code to implement");
+						//new RulesModal(this.app).open();
+						//new RulesModal(this.app).open();
+						const arrayForModal: string[][] = this.profileSettings[this.activeProfile].rulesArray;
+						console.log("==> Rules Array",arrayForModal);					
+						/*[
+							['name', 'John'],
+							['age', '30'],
+							['city', 'New York']
+						]*/;
+				
+						// Create and show modal
+						//const modal = new MapEditorModal(this.app, sampleMap, (updatedMap) => {
+						//	console.log('Updated map:', updatedMap);
+						//});
+						const modal = new RuleEditorModal(this.app, arrayForModal, (updatedMap) => {
+							console.log('Updated map:', updatedMap);
+						});
+						modal.open();
+						/*const modal = new MapEditorModal2(this.app, sampleMap);
+						console.log("==> New Modal and code to implement");*/
 						
 					})
 			);
-		}
+
+	//Toggel for debug logging
+	new Setting(this.containerEl)
+      .setName("Debug logging")
+      .setDesc("Whether debug logging should be on or off.")
+      .addToggle((toggle) => {
+        toggle.setValue(true);
+        toggle.onChange(async (value) => {
+			if (value) {
+				console.log("==> Debug logging is on");
+			} else {
+				console.log("==> Debug logging is off");
+			}
+        });
+      });
+
+		} // End of display function
 
 	private newListSetting(
 		containerEl: HTMLElement,// Container for the setting
@@ -240,11 +278,13 @@ export class Markdown2HtmlSettingsTab extends PluginSettingTab {
 								classList: [],
 								isActiveProfile: false,
 								exportCleaned: true,
-								rulesMap:new Map<string, string>([["", ""]]),
+								rulesArray:[["", ""]],	
 							};
+							
 							this.display
 						}
-
+						this.containerEl.empty();
+						this.display();
 
 						this.save();
 						input.setValue("");
@@ -300,6 +340,7 @@ export class Markdown2HtmlSettingsTab extends PluginSettingTab {
 			if (istProfile) {
 				console.log("==> HEUREKA:", istProfile);
 				delete this.profileSettings[elementName];
+				this.containerEl.empty();
 				this.display();
 				};
 
@@ -368,7 +409,7 @@ class RulesModal extends Modal {
 		new Setting(container)
   .setName(`Item ${i}`)
   .addText(text => {
-    text.setPlaceholder(`Input ${i}`);
+    text.setPlaceholder(`Input ${i}`); //label
     if (i % 2 === 0) {
       b += 1;
       text.inputEl.name = `itemRowB-${b}`;
@@ -387,3 +428,385 @@ class RulesModal extends Modal {
 	  this.contentEl.empty();
 	} //closer for onClose
   } // closer for modal
+
+export class MapEditorModal extends Modal {
+	mapData: Map<string, string>;
+	containerEl: HTMLElement;
+
+    //constructor(app: App, mapData: Map<string, string>, onSave?: (newMap: Map<string, string>) => void) {
+	constructor(app: App, mapData: Map<string, string>) {
+	super(app);
+	this.mapData = new Map(mapData);
+        //this.onSave = onSave;
+	}
+
+    onOpen() {
+        const { contentEl } = this;
+        contentEl.empty();
+        
+        // Create main container with scrolling
+        this.containerEl = contentEl.createDiv({
+            cls: 'map-editor-container',
+            attr: {
+                style: `
+                    max-height: 80vh;
+                    overflow-y: auto;
+                    padding: 20px;
+                `
+            }
+        });
+
+        // Create grid layout for two columns
+        const gridContainer = this.containerEl.createDiv('grid-container');
+        gridContainer.style.cssText = `
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 20px;
+            width: 100%;
+        `;
+
+        // Add key-value pairs to grid
+        let rowIndex = 0;
+        this.mapData.forEach((value, key) => {
+            // Create row container
+            const rowContainer = gridContainer.createDiv(`row-${rowIndex}`);
+            rowContainer.style.cssText = `
+                display: flex;
+                align-items: center;
+                gap: 10px;
+                margin-bottom: 10px;
+            `;
+
+            // Key label
+            const keyLabel = rowContainer.createSpan({
+                text: key,
+                cls: 'key-label'
+            });
+            
+            // Value input
+            const valueInput = rowContainer.createEl('input', {
+                cls: 'value-input',
+                attr: {
+                    type: 'text',
+                    value: value,
+                    placeholder: 'Enter value...'
+                }
+            });
+
+            // Update handler
+            valueInput.addEventListener('change', () => {
+                this.mapData.set(key, valueInput.value);
+               // if (this.onSave) {
+                //    this.onSave(new Map(this.mapData));
+                //}
+            });
+
+            rowIndex++;
+        });
+    }
+
+    onClose() {
+        const { contentEl } = this;
+        contentEl.empty();
+    }
+}
+
+export class RuleEditorModal extends Modal {
+	private _rulesData: string[][];
+	private onSave?: (newRulesData: string[][]) => void;
+
+	constructor(app: App, rulesData: string[][], onSave?: (newRulesData: string[][]) => void) {
+		super(app);
+		this._rulesData = rulesData;
+		this.onSave = onSave;
+	}
+	get rulesData(): string[][] {
+		return this._rulesData;
+	}	
+	
+	display() {
+	const { contentEl } = this;
+	contentEl.empty();
+
+		
+
+	// Enable vertical scrolling
+	contentEl.style.overflowY = 'auto';
+	//contentEl.style.maxHeight = '70vh'; // 70% of viewport height
+	
+	contentEl.style.overflowX = 'auto'; // Enable horizontal scrolling
+	//contentEl.style.width = '80%'; // Set width to 100% of the viewport
+        // Create main container
+		//const tableHeading= contentEl.createDiv();
+		//tableHeading.setText("Order");
+
+
+		const container = contentEl.createDiv();
+		container.createEl('h2').setText("Replacement Rules");
+		const tableHeader = container.createDiv();
+		//tableHeader.createSpan('table-header-Order').setText("Order");
+		tableHeader.createSpan('table-header-Rules').setText("Rules");
+		tableHeader.createSpan('table-header-Replacmente').setText("Replacment");
+		container.createEl('br');
+
+		const inputNewRule = new Setting(container);
+		inputNewRule.addText(text => {
+			
+			text.inputEl.style.width = "100%";
+		
+			text.setPlaceholder("Enter new rule to add ...");
+			text.setValue("");
+			text.inputEl.setAttribute("id", `newRule`);
+			text.inputEl.setAttribute("name", `newRule`);
+			text.inputEl.addEventListener("keypress", (e: KeyboardEvent) => {
+				if (e.key === "Enter") {
+					this.rulesData.push([text.inputEl.value,""]);
+					console.log("==> New Rule Value",text.inputEl.value);
+					this.display();
+					const newInputEl = document.getElementById("newRule") as HTMLInputElement;
+					if (newInputEl) {
+						newInputEl.focus();
+					}	
+					//text.inputEl.focus();
+					//text.inputEl.value = "";
+				}
+			});
+		
+	 });
+
+		// Add key-value pairs
+		this.rulesData.forEach((rule, index, array) => {
+            // Create key label
+			//const ruleNumber = container.createSpan();
+			//ruleNumber.setText('Rule ' + index + ': ');
+
+            // Create space between label and input
+			//container.createSpan().setText(' ');
+			
+//const ruleContainer = container.createDiv('rule-container');
+/*	attr: {
+		type: 'text',
+		value: rule[0],
+		placeholder: 'Enter value...',
+		id: `${index}`
+	}
+});*/
+
+const SingleElement = new Setting(container);
+//SingleElement.setName(index+":");
+//SingleElement.setName("");
+// Style the label width (setName output)
+//const labelEl = SingleElement.settingEl.querySelector('.setting-item-name') as HTMLElement;
+//if (labelEl) {
+//	labelEl.style.width = "5%"; // or 150px, etc.
+//}
+
+// Remove the div element which contains the label and creates the first column
+const labelEl = SingleElement.settingEl.querySelector('.setting-item-info');
+console.log("==> labelEl",labelEl);
+if (labelEl) {
+	labelEl.remove();
+}
+
+SingleElement.addText(text => {
+	 // Set the width of the input field (e.g., 300px)
+	text.inputEl.style.width = "100%";
+
+	 // Optionally, set the font size (e.g., 18px)
+	//text.inputEl.style.fontSize = "18px";
+	//text.inputEl.style.fontFamily = "monospace";
+
+	text.setPlaceholder("Enter rule...");
+	text.setValue(rule[0]);
+	text.inputEl.setAttribute("id", `${index}`);
+	text.inputEl.setAttribute("name", `itemRowA-${index}`);
+	text.inputEl.addEventListener("change", () => {
+		const currentRuleValue = rule[0]; // Get the  rule value
+		const indexNumber: number = +text.inputEl.id;
+		console.log("==> currentRuleValue",currentRuleValue);
+		console.log("==> index",index);
+		console.log("==> inputField.value",text.inputEl.value);
+		// Check if the currentRuleValue is not empty
+		if (text.inputEl.value === "") {
+			// If the currentRuleValue is empty, remove the rule from the rulesData array
+			this.rulesData.splice(indexNumber, 1);
+			this.display();
+		} else if (currentRuleValue) {
+			// If the currentRuleValue is not empty, update the value in the rulesData array	
+
+			// Update the value in the array
+			this.rulesData[indexNumber][0] = text.inputEl.value;
+			console.log("==> IF inputKey.value",text.inputEl.value);
+		}
+		console.log("==> New Rule Data",this.rulesData[indexNumber][0]);});
+		if (this.onSave) { //Check if this makes sense and how callback works
+			this.onSave(this._rulesData);
+		}
+	text.inputEl.addEventListener("keypress", (e: KeyboardEvent) => {
+		if (e.key === "Enter") {
+			console.log("==> Enter");
+		}
+	});
+});
+SingleElement.addText(text => {
+	text.inputEl.style.width = "100%";
+	text.setPlaceholder("Enter replacement...");
+	text.setValue(rule[1]);
+	text.inputEl.setAttribute("id", `${index}`);
+	text.inputEl.setAttribute("name", `itemRowB-${index}`);
+
+	text.inputEl.addEventListener("change", () => {
+		//const currentRuleValue = rule[1];
+		const indexNumber: number = +text.inputEl.id;
+		//console.log("==> currentRuleValue",currentRuleValue);
+		console.log("==> index",index);
+		console.log("==> inputField.value",text.inputEl.value);
+		
+			// Update the value in the mapData
+			this.rulesData[indexNumber][1] = text.inputEl.value;
+			console.log("==> IF inputKey.value",text.inputEl.value);
+		
+		console.log("==> New Rule Data",this.rulesData[indexNumber][1]);});
+
+	text.inputEl.addEventListener("keypress", (e: KeyboardEvent) => {
+		if (e.key === "Enter") {
+			console.log("==> Enter");
+		}
+	});
+});
+ // Add the plus button
+SingleElement.addExtraButton((button) =>{ 
+	button.setIcon("circle-arrow-up");
+	button.onClick(() => {
+		
+		const indexNumber: number = +button.extraSettingsEl.id;
+		
+		console.log("==> index",index);
+	//exchange the order of the rules
+		if (indexNumber > 0) {
+			const temp = this.rulesData[indexNumber];
+			this.rulesData[indexNumber] = this.rulesData[indexNumber - 1];
+			this.rulesData[indexNumber - 1] = temp;
+			this.display();
+		}
+		console.log("==> Button " + button.extraSettingsEl.getAttribute("id") +" up clicked");
+	});
+	button.extraSettingsEl.setAttribute("id", `${index}`);
+	button.extraSettingsEl.setAttribute("name", `ButtonUp`);
+	console.log("==> Button " + button.extraSettingsEl.getAttribute("id") +" up clicked")
+});
+SingleElement.addExtraButton(button => {
+	button.setIcon("circle-arrow-down");
+	button.onClick(() => {
+		const indexNumber: number = +button.extraSettingsEl.id;
+		
+		console.log("==> index",index);
+	//exchange the order of the rules
+		if (indexNumber < this.rulesData.length-1) {
+			console.log("==> indexNumber",indexNumber);
+			console.log("==> this.rulesData.length",this.rulesData.length);
+			const temp = this.rulesData[indexNumber];
+			this.rulesData[indexNumber] = this.rulesData[indexNumber + 1];
+			this.rulesData[indexNumber + 1] = temp;
+			this.display();
+		}
+		console.log("==> Button " + button.extraSettingsEl.getAttribute("id") +" down clicked");
+	});
+	button.extraSettingsEl.setAttribute("id", `${index}`);
+	button.extraSettingsEl.setAttribute("name", `ButtonDown`);
+	console.log("==> Button " + button.extraSettingsEl.getAttribute("id") +" up clicked")
+});
+
+
+/*
+const ruleAddButton = container.createEl("button", { text: "Click Me"});
+ruleAddButton.createSpan({ cls: "lucide lucide-plus" });
+ruleAddButton.setAttribute("icon", "list-plus");
+ruleAddButton.setAttribute("id", `${index}`);
+ruleAddButton.onClickEvent(() => {
+	console.log("==> Button clicked", ruleAddButton);
+	console.log("==> Button ID ", ruleAddButton.id);
+	console.log("==> Button TextContent ", ruleAddButton.textContent);
+	console.log("==> Button Value ", ruleAddButton.value);
+	console.log("==> Button indexNumber ", index);
+	// Perform your action here	
+	// Add your logic here
+	// For example, you can add a new rule to the rulesData array
+	//this.rulesData.push(["", ""]);
+});			
+
+container.createEl('br');
+
+//==============================================
+// Update handler
+inputRuleName.addEventListener('change', () => {
+	// Find key in mapData
+
+	const currentRuleValue = rule[0];
+	const indexNumber: number = +inputRuleName.id;
+	console.log("==> currentRuleValue",currentRuleValue);
+	console.log("==> index",index);
+	console.log("==> inputField.value",inputRuleName.value);
+if (currentRuleValue) {
+	// Update the value in the mapData
+	
+	this._rulesData[indexNumber][0] = inputRuleName.value;
+	console.log("==> IF inputKey.value",inputRuleName.value);
+} 
+console.log("==> New Rule Data",this._rulesData[indexNumber][0]);
+/*else {
+	// If the key doesn't exist, add it to the mapData if it is not empty
+	if (inputRuleName.value.trim() !== "") {
+		this._mapData[index][0]= "";
+	}
+}*/
+/*if (this.onSave) {
+	this.onSave(this._rulesData);
+	console.log("==> this.OnSave",this.onSave);
+}*/
+//this.mapData.delete(key); // Remove the old key
+/*if (inputRuleName.value.trim() === "") {
+	this.rulesData.splice(indexNumber,1);// Delete empty keys
+	this.display() 
+}*/
+//console.log("==> this.mapData",this._mapData);
+	/*this.mapData.set(key, inputKey.value);
+	if (this.onSave) {
+		this.onSave(new Map(this.mapData));
+	}*/
+//});*/
+		});
+/*
+            // Create inputReplacment field
+            const inputReplacement = container.createEl('input', {
+                attr: {
+                    type: 'text',
+                    value: value,
+                    placeholder: 'Enter value...'
+                }
+            });
+
+            // Add line break after each pair
+            container.createEl('br');
+
+            // Update handler
+            inputReplacement.addEventListener('change', () => {
+                this._mapData.set(key, inputReplacement.value);
+                if (this.onSave) {
+                    this.onSave(new Map(this._mapData));
+                }
+            });
+        });*/
+	}
+
+	onOpen() {
+	this.modalEl.style.width = "80%"; // Set width to 80% of the viewport
+	this.display();
+}
+
+	onClose() {
+		
+		const { contentEl } = this;
+		contentEl.empty();
+	}
+}
