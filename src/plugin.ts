@@ -22,16 +22,40 @@ export default class Markdown2Html extends Plugin {
 		addIcon(
 			"markdown2html-icon",
 			`<g transform="scale(4.1666)" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
-			<path d="M10 22v-6h3.5" />
-			<path d="M13.5 19H10" />
-			<path d="m15 6 2.5 2V2" />
-			<path d="m17 16 3 3-3 3" />
-			<path d="M17.5 8 20 6" />
-			<path d="M2 12h20" />
-			<path d="M4.11 8V2l3.74 3 3.65-3v6" />
-			<path d="m6 16-3 3 3 3" />
+			<path d="m15 17.5 2.5-2 2.5 2" />
+			<path d="m15 3-3 3 3 3" />
+			<path d="M17.5 21.5v-6" />
+			<path d="m18.5 3 3 3-3 3" />
+			<path d="M2 12.5h20" />
+			<path d="M4.11 21.5v-6l3.74 3 3.65-3v6" />
+			<path d="M4.5 9.5v-7H8" />
+			<path d="M8 5.5H4.5" />
 			</g>`
 		);
+
+		//Add a menu entry in the pop up file menu and get the selected file or files of the selected directory and subdirectories 
+		this.registerEvent(
+			this.app.workspace.on('file-menu', (menu, file) => {
+				menu.addItem((item) => {
+					item
+						.setTitle('Foundry batch export')
+						.setIcon('markdown2html-icon')
+						.onClick(() => {
+					console.log("Registered a file menue selection")
+					console.log("Filepath",file.path)
+					const folder = file.path;
+						//getMarkdownFiles returns an array of objects of ALL markdown files in the obsidian vault
+						const files = this.app.vault.getMarkdownFiles().filter(file =>file.path.startsWith(folder + "/"));
+						for (let i = 0; i < files.length; i++) {
+						console.log(files[i].path);
+						console.log(files[i].basename);
+						console.log(files[i].name);
+						console.log(files[i].extension);
+						}
+					});
+				});
+			})
+			);
 
 		// init settings
 		const settingsTab = new Markdown2HtmlSettingsTab(this.app, this);
@@ -90,8 +114,10 @@ export default class Markdown2Html extends Plugin {
 		}, Number.MAX_SAFE_INTEGER);
 	}
 
+	
 	/** Openes a modal to let the user know that the copy is in progress and triggers the render of the markdown document or selection. */
-	private renderHtml = async (editor: Editor) => {
+	private renderHtml = async (editor: Editor,settings?: Markdown2HtmlSettings,fileListToRender?: string[]) => {
+		//check if settings have file list in that case branche into the batch rendering?
 		const path = this.app.workspace.activeEditor?.file?.path ?? "";
 		const content = () => {
 			if (editor.somethingSelected()) {
@@ -100,8 +126,11 @@ export default class Markdown2Html extends Plugin {
 				return editor.getValue();
 			}
 		};
-
+//I never get this as a debug message??? AHA THIS IS a DEBUG Message and not a LOG!
 		console.debug("Markdown2Html: Copying to clipboard", path);
+		// The result of the render is stored in copyResult by appending the rendered html elements one by one
+		// so the render result is stored on the property and not as a return  value also according to line 103ff the render process is called several times?
+		console.log("There was a render call");
 		await MarkdownRenderer.render(this.app, content(), this.copyResult as HTMLElement, path, this);
 	};
 

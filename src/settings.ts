@@ -244,42 +244,8 @@ export class Markdown2HtmlSettingsTab extends PluginSettingTab {
 					})
 			);
 
-	//Toggel for dirty export
-	new Setting(this.containerEl)
-	.setName("Dirty export")
-	.setDesc("Whether an unmodified export should take place. This will override all other markdown modifying settings.")
-	.addToggle((toggle) => {
-		toggle.setValue(this.profileSettings[this.activeProfile].exportDirty);
-		toggle.onChange(async (value) => {
-			if (value) {
-				this.profileSettings[this.activeProfile].exportDirty = true;
-				this.save();
-			} else {
-				this.profileSettings[this.activeProfile].exportDirty = false;
-				console.log("==> Dirty export is off");
-				this.save();
-			}
-		});
-	});
 
-		//Toggel for internal link resolution
-		new Setting(this.containerEl)
-		.setName("Wikilink Resolution")
-		.setDesc("Whether internal Wikilinks should be resolved and exporterd with the Obsidian vault path.")
-		.addToggle((toggle) => {
-			toggle.setValue(this.profileSettings[this.activeProfile].internalLinkResolution);
-			toggle.onChange(async (value) => {
-				if (value) {
-					this.profileSettings[this.activeProfile].internalLinkResolution = true;
-					this.save();
-				} else {
-					this.profileSettings[this.activeProfile].internalLinkResolution = false;
-					this.save();
-				}
-			});
-		});
-
-		//Toggel for clippboard export
+		//Toggle for clippboard export
 		new Setting(this.containerEl)
 		.setName("Clippboard export")
 		.setDesc("Whether the HTML should be exported to the clippboard.")
@@ -299,26 +265,74 @@ export class Markdown2HtmlSettingsTab extends PluginSettingTab {
 			});
 		});
 	
-		//Toggel for file export
-		new Setting(this.containerEl)
-		.setName("File export")
-		.setDesc("Whether the HTML should be exported to a file.")
-		.addToggle((toggle) => {
+		//Toggle for file export
+		const filePathInput = new Setting(this.containerEl)
+		filePathInput.setName("File export")
+		filePathInput.setDesc("Whether the HTML should be exported to a file.")
+		//const filePathInput = new Setting(this.containerEl);
+		if (this.profileSettings[this.activeProfile].exportFile){
+		filePathInput.addText(text => {
+			text.inputEl.style.width = "100%";
+			text.setPlaceholder("Enter path...");
+			
+			text.inputEl.addEventListener("change", () => {
+				
+				console.log("==> New Input path");});
+		});}
+		filePathInput.addToggle((toggle) => {
 			toggle.setValue(this.profileSettings[this.activeProfile].exportFile);
 			toggle.onChange(async (value) => {
 				if (value) {
 					this.profileSettings[this.activeProfile].exportFile = true;
 					this.save();
+					this.display();
 					console.log("==> File export is on");
 				} else {
 					this.profileSettings[this.activeProfile].exportFile = false;
 					this.save();
+					this.display();
 					console.log("==> File export is off");
 				}
 			});
 		});
 	
-			//Toggel for file export
+			//Toggle for dirty export
+	new Setting(this.containerEl)
+	.setName("Dirty export")
+	.setDesc("Whether an unmodified export should take place. This will override all other markdown modifying settings.")
+	.addToggle((toggle) => {
+		toggle.setValue(this.profileSettings[this.activeProfile].exportDirty);
+		toggle.onChange(async (value) => {
+			if (value) {
+				this.profileSettings[this.activeProfile].exportDirty = true;
+				this.save();
+			} else {
+				this.profileSettings[this.activeProfile].exportDirty = false;
+				console.log("==> Dirty export is off");
+				this.save();
+			}
+		});
+	});
+
+		//Toggle for internal link resolution
+		new Setting(this.containerEl)
+		.setName("Wikilink resolution")
+		.setDesc("Whether internal wikilinks should be resolved and exported with the Obsidian vault path.")
+		.addToggle((toggle) => {
+			toggle.setValue(this.profileSettings[this.activeProfile].internalLinkResolution);
+			toggle.onChange(async (value) => {
+				if (value) {
+					this.profileSettings[this.activeProfile].internalLinkResolution = true;
+					this.save();
+				} else {
+					this.profileSettings[this.activeProfile].internalLinkResolution = false;
+					this.save();
+				}
+			});
+		});
+
+
+			//Toggle for file export
 			new Setting(this.containerEl)
 			.setName("Foundry export")
 			.setDesc("Whether the HTML should be exported to foundry by REST call.")
@@ -531,9 +545,12 @@ export class RuleEditorModal extends Modal {
 			text.setValue("");
 			text.inputEl.setAttribute("id", `newRule`);
 			text.inputEl.setAttribute("name", `newRule`);
+			let fieldValue = "";
+			//Seems I need to save the value on change else I get emtpy rules and  things go haywire
+			text.inputEl.addEventListener("change", () => {fieldValue=text.inputEl.value;})
 			text.inputEl.addEventListener("keypress", (e: KeyboardEvent) => {
 				if (e.key === "Enter") {
-					this.rulesData.push([text.inputEl.value,""]);
+					this.rulesData.push([fieldValue,""]);
 					console.log("==> New Rule Value",text.inputEl.value);
 					this.display();
 					const newInputEl = document.getElementById("newRule") as HTMLInputElement;
