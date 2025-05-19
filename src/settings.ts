@@ -12,8 +12,13 @@ export interface Markdown2HtmlSettings {
 	attributeList: string[];
 	classList: string[];
 	isActiveProfile: boolean;
-	exportCleaned: true;
 	rulesArray: string[][];
+	exportDirty: boolean;
+	exportFile: boolean;
+	exportClipboard: boolean;
+	exportFoundry: boolean;
+	internalLinkResolution: boolean;
+	
 }
 
 export interface ProfileSettings  {
@@ -26,17 +31,22 @@ export const DEFAULT_SETTINGS: ProfileSettings = {
 	attributeList: ["id", "href", "src", "width", "height", "alt", "colspan", "rowspan"],
 	classList: [],
 	isActiveProfile: true,
-	exportCleaned: true,
-	rulesArray: [["div", "p"]], 
-}};
+	rulesArray: [["div", "p"]],
+	exportDirty: false,
+	exportFile: false,
+	exportClipboard: true,
+	exportFoundry: true,
+	internalLinkResolution: false,
+	},
+};
 
 //let _profileName :string = 'default';
 
 export class Markdown2HtmlSettingsTab extends PluginSettingTab {
 	private plugin: Markdown2Html;
-	private profiledata: ProfileSettings;
-	activeProfile: string;
-	private data: Markdown2HtmlSettings;//Markdown2HtmlSettings;
+	private profiledata: ProfileSettings;//Data with all profiles
+	activeProfile: string; //name of the active profile
+	private data: Markdown2HtmlSettings;//active profile data;
 
 	constructor(app: App, plugin: Markdown2Html) {
 		super(app, plugin);
@@ -64,12 +74,16 @@ export class Markdown2HtmlSettingsTab extends PluginSettingTab {
 	set ActiveMarkdown2HtmlSettingsData(dataFromProfile: ProfileSettings) {
 		//this.data=DEFAULT_SETTINGS['default'];
 		if (dataFromProfile) {
-			let activeProfile: string = Object.keys(dataFromProfile).find(key => dataFromProfile[key].isActiveProfile === true) || "default";
-			this.activeProfile = activeProfile; //eventuell unnötig es sei denn ich kann es extern woanders verwenden
-			this.data=dataFromProfile[activeProfile];
+			let resultActiveProfileSearch: string = Object.keys(dataFromProfile).find(key => dataFromProfile[key].isActiveProfile === true) || "default";
+			this.activeProfile = resultActiveProfileSearch; //eventuell unnötig es sei denn ich kann es extern woanders verwenden
+			this.data=dataFromProfile[resultActiveProfileSearch];
 		}	
 	}
-	
+
+	get activeProfileData() {
+		//this.data=DEFAULT_SETTINGS['default']; == Improve by checking if active profile exists and else set default
+			return this.profiledata[this.activeProfile];	
+	}
 
 	display(): void {
 		const { containerEl } = this;
@@ -77,7 +91,7 @@ export class Markdown2HtmlSettingsTab extends PluginSettingTab {
 
 		new Setting(containerEl).setHeading().setName("Active Profile");
 		new Setting(containerEl).setDesc("Select active profile to be used from the dropdown")
-		 .addDropdown(dropdown => {
+		.addDropdown(dropdown => {
 			let dropdownList: string[] = Object.keys(this.profiledata).sort();
 			for (let i = 0; i < dropdownList.length; i++) {
 				dropdown.addOption(dropdownList[i], dropdownList[i]);
@@ -214,30 +228,117 @@ export class Markdown2HtmlSettingsTab extends PluginSettingTab {
 						//const modal = new MapEditorModal(this.app, sampleMap, (updatedMap) => {
 						//	console.log('Updated map:', updatedMap);
 						//});
-						const modal = new RuleEditorModal(this.app, arrayForModal, (updatedMap) => {
-							console.log('Updated map:', updatedMap);
+						const modal = new RuleEditorModal(this.app, arrayForModal, (updatedRulesArray) => {
+							console.log('Updated rules Array:', updatedRulesArray);
+							this.profileSettings[this.activeProfile].rulesArray = updatedRulesArray;
+							this.save();
+							this.display();
+
+							//console.log("==> Updated Rules Array",this.profileSettings[this.activeProfile].rulesArray);
+
 						});
 						modal.open();
 						/*const modal = new MapEditorModal2(this.app, sampleMap);
-						console.log("==> New Modal and code to implement");*/
+						console.log("==> New Modal and code to implement",);*/
 						
 					})
 			);
 
-	//Toggel for debug logging
+	//Toggel for dirty export
 	new Setting(this.containerEl)
-      .setName("Debug logging")
-      .setDesc("Whether debug logging should be on or off.")
-      .addToggle((toggle) => {
-        toggle.setValue(true);
-        toggle.onChange(async (value) => {
+	.setName("Dirty export")
+	.setDesc("Whether an unmodified export should take place. This will override all other markdown modifying settings.")
+	.addToggle((toggle) => {
+		toggle.setValue(this.profileSettings[this.activeProfile].exportDirty);
+		toggle.onChange(async (value) => {
 			if (value) {
-				console.log("==> Debug logging is on");
+				this.profileSettings[this.activeProfile].exportDirty = true;
+				this.save();
 			} else {
-				console.log("==> Debug logging is off");
+				this.profileSettings[this.activeProfile].exportDirty = false;
+				console.log("==> Dirty export is off");
+				this.save();
 			}
-        });
-      });
+		});
+	});
+
+		//Toggel for internal link resolution
+		new Setting(this.containerEl)
+		.setName("Wikilink Resolution")
+		.setDesc("Whether internal Wikilinks should be resolved and exporterd with the Obsidian vault path.")
+		.addToggle((toggle) => {
+			toggle.setValue(this.profileSettings[this.activeProfile].internalLinkResolution);
+			toggle.onChange(async (value) => {
+				if (value) {
+					this.profileSettings[this.activeProfile].internalLinkResolution = true;
+					this.save();
+				} else {
+					this.profileSettings[this.activeProfile].internalLinkResolution = false;
+					this.save();
+				}
+			});
+		});
+
+		//Toggel for clippboard export
+		new Setting(this.containerEl)
+		.setName("Clippboard export")
+		.setDesc("Whether the HTML should be exported to the clippboard.")
+		.addToggle((toggle) => {
+			toggle.setValue(this.profileSettings[this.activeProfile].exportClipboard);
+			toggle.onChange(async (value) => {
+				if (value) {
+					this.profileSettings[this.activeProfile].exportClipboard = true;
+					this.save();
+					console.log("==> Clippboard export is on");
+					
+				} else {
+					this.profileSettings[this.activeProfile].exportClipboard = false;
+					this.save();
+					console.log("==> Clippboard export is off");
+				}
+			});
+		});
+	
+		//Toggel for file export
+		new Setting(this.containerEl)
+		.setName("File export")
+		.setDesc("Whether the HTML should be exported to a file.")
+		.addToggle((toggle) => {
+			toggle.setValue(this.profileSettings[this.activeProfile].exportFile);
+			toggle.onChange(async (value) => {
+				if (value) {
+					this.profileSettings[this.activeProfile].exportFile = true;
+					this.save();
+					console.log("==> File export is on");
+				} else {
+					this.profileSettings[this.activeProfile].exportFile = false;
+					this.save();
+					console.log("==> File export is off");
+				}
+			});
+		});
+	
+			//Toggel for file export
+			new Setting(this.containerEl)
+			.setName("Foundry export")
+			.setDesc("Whether the HTML should be exported to foundry by REST call.")
+			.addToggle((toggle) => {
+				toggle.setValue(this.profileSettings[this.activeProfile].exportFoundry);
+				toggle.onChange(async (value) => {
+					if (value) {
+						this.profileSettings[this.activeProfile].exportFoundry = true;
+						this.save();
+						console.log("==> Foundry export is on");
+					} else {
+						this.profileSettings[this.activeProfile].exportFoundry = false;
+						this.save();
+						console.log("==> Foundry export is off");
+					}
+				});
+			});
+			
+		
+
 
 		} // End of display function
 
@@ -277,8 +378,12 @@ export class Markdown2HtmlSettingsTab extends PluginSettingTab {
 								attributeList: [],
 								classList: [],
 								isActiveProfile: false,
-								exportCleaned: true,
-								rulesArray:[["", ""]],	
+								rulesArray:[["", ""]],
+								exportDirty: false,
+								exportFile: false,
+								exportClipboard: true,
+								exportFoundry: true,
+								internalLinkResolution: true,	
 							};
 							
 							this.display
@@ -378,138 +483,6 @@ export class Markdown2HtmlSettingsTab extends PluginSettingTab {
 	);
 }
 
-class RulesModal extends Modal {
-	constructor(app: App) {
-	  super(app);
-	}
-	onOpen() {
-	const { contentEl } = this;
-	contentEl.setText("This is your modal form!");
-	
-	 // Enable vertical scrolling
-	 contentEl.style.overflowY = 'auto';
-	 contentEl.style.maxHeight = '70vh'; // 70% of viewport height
-
-	     // Create input container
-	const container = contentEl.createDiv();
-    
-		 // Add text input
-		 new Setting(container)
-		   .setName('Enter your text')
-		   .addText(text => 
-		text
-			 .onChange(value => console.log(value))
-		   );
-
-		   // Add multiple elements to demonstrate scrolling
-		   let a: number = 0;
-		   let b: number = 0;
-    for (let i = 1; i <= 20; i++) {
-	
-		new Setting(container)
-  .setName(`Item ${i}`)
-  .addText(text => {
-    text.setPlaceholder(`Input ${i}`); //label
-    if (i % 2 === 0) {
-      b += 1;
-      text.inputEl.name = `itemRowB-${b}`;
-      text.inputEl.id = `itemRowB-${b}`;
-    } else {
-      a += 1;
-      text.inputEl.name = `itemRowA-${a}`;
-    }
-  }); // closer for addText
-
-	  } //closer for for loop
-	//console.log("Textfield 10:",this.contentEl['itemRowA-5']);
-	  // Add form elements here as needed
-	} // closer for onOpen
-	onClose() {
-	  this.contentEl.empty();
-	} //closer for onClose
-  } // closer for modal
-
-export class MapEditorModal extends Modal {
-	mapData: Map<string, string>;
-	containerEl: HTMLElement;
-
-    //constructor(app: App, mapData: Map<string, string>, onSave?: (newMap: Map<string, string>) => void) {
-	constructor(app: App, mapData: Map<string, string>) {
-	super(app);
-	this.mapData = new Map(mapData);
-        //this.onSave = onSave;
-	}
-
-    onOpen() {
-        const { contentEl } = this;
-        contentEl.empty();
-        
-        // Create main container with scrolling
-        this.containerEl = contentEl.createDiv({
-            cls: 'map-editor-container',
-            attr: {
-                style: `
-                    max-height: 80vh;
-                    overflow-y: auto;
-                    padding: 20px;
-                `
-            }
-        });
-
-        // Create grid layout for two columns
-        const gridContainer = this.containerEl.createDiv('grid-container');
-        gridContainer.style.cssText = `
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 20px;
-            width: 100%;
-        `;
-
-        // Add key-value pairs to grid
-        let rowIndex = 0;
-        this.mapData.forEach((value, key) => {
-            // Create row container
-            const rowContainer = gridContainer.createDiv(`row-${rowIndex}`);
-            rowContainer.style.cssText = `
-                display: flex;
-                align-items: center;
-                gap: 10px;
-                margin-bottom: 10px;
-            `;
-
-            // Key label
-            const keyLabel = rowContainer.createSpan({
-                text: key,
-                cls: 'key-label'
-            });
-            
-            // Value input
-            const valueInput = rowContainer.createEl('input', {
-                cls: 'value-input',
-                attr: {
-                    type: 'text',
-                    value: value,
-                    placeholder: 'Enter value...'
-                }
-            });
-
-            // Update handler
-            valueInput.addEventListener('change', () => {
-                this.mapData.set(key, valueInput.value);
-               // if (this.onSave) {
-                //    this.onSave(new Map(this.mapData));
-                //}
-            });
-
-            rowIndex++;
-        });
-    }
-
-    onClose() {
-        const { contentEl } = this;
-        contentEl.empty();
-    }
-}
 
 export class RuleEditorModal extends Modal {
 	private _rulesData: string[][];
@@ -800,12 +773,15 @@ console.log("==> New Rule Data",this._rulesData[indexNumber][0]);
 	}
 
 	onOpen() {
-	this.modalEl.style.width = "80%"; // Set width to 80% of the viewport
+	this.modalEl.style.width = "50vw"; // Set width to 80% of the viewport
 	this.display();
 }
 
 	onClose() {
-		
+		console.log("==> Close Modal: this.onSave",this.onSave);
+		if (this.onSave) {
+            this.onSave?.(this.rulesData); // Pass the updated rules data to the callback
+		}
 		const { contentEl } = this;
 		contentEl.empty();
 	}
