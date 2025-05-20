@@ -1,4 +1,4 @@
-import { App, Modal, debounce, ExtraButtonComponent, PluginSettingTab, Setting, TextComponent, ButtonComponent } from "obsidian";
+import { App, Modal, debounce, ExtraButtonComponent, PluginSettingTab, Setting, TextComponent, ButtonComponent, ValueComponent } from "obsidian";
 import Markdown2Html from "src/plugin";
 import { isEmpty } from "./utils";
 import { isAsyncFunction } from "util/types";
@@ -18,6 +18,7 @@ export interface Markdown2HtmlSettings {
 	exportClipboard: boolean;
 	exportFoundry: boolean;
 	internalLinkResolution: boolean;
+	htmlExportFilePath:string;
 	
 }
 
@@ -37,6 +38,7 @@ export const DEFAULT_SETTINGS: ProfileSettings = {
 	exportClipboard: true,
 	exportFoundry: true,
 	internalLinkResolution: false,
+	htmlExportFilePath:"",
 	},
 };
 
@@ -89,6 +91,7 @@ export class Markdown2HtmlSettingsTab extends PluginSettingTab {
 		const { containerEl } = this;
 		containerEl.empty();
 
+		//profile dropdown
 		new Setting(containerEl).setHeading().setName("Active Profile");
 		new Setting(containerEl).setDesc("Select active profile to be used from the dropdown")
 		.addDropdown(dropdown => {
@@ -115,7 +118,8 @@ export class Markdown2HtmlSettingsTab extends PluginSettingTab {
 			
 			
 		}); //End of dropdown
-
+		
+		
 		new Setting(containerEl).setHeading().setName("Profiles");
 		this.newListSetting(
 			containerEl,
@@ -126,6 +130,7 @@ export class Markdown2HtmlSettingsTab extends PluginSettingTab {
 			 true
 		);
 
+		//attribute setting
 		new Setting(containerEl).setHeading().setName("Attributes");
 		
 		this.newListSetting(
@@ -168,6 +173,7 @@ export class Markdown2HtmlSettingsTab extends PluginSettingTab {
 					})
 			);
 
+		//classes selection	
 		new Setting(containerEl).setHeading().setName("Classes");
 		this.newListSetting(
 			containerEl,
@@ -218,12 +224,6 @@ export class Markdown2HtmlSettingsTab extends PluginSettingTab {
 						//new RulesModal(this.app).open();
 						const arrayForModal: string[][] = this.profileSettings[this.activeProfile].rulesArray;
 						console.log("==> Rules Array",arrayForModal);					
-						/*[
-							['name', 'John'],
-							['age', '30'],
-							['city', 'New York']
-						]*/;
-				
 						// Create and show modal
 						//const modal = new MapEditorModal(this.app, sampleMap, (updatedMap) => {
 						//	console.log('Updated map:', updatedMap);
@@ -276,9 +276,12 @@ export class Markdown2HtmlSettingsTab extends PluginSettingTab {
 			text.setPlaceholder("Enter path...");
 			
 			text.inputEl.addEventListener("change", () => {
-				
+				this.profileSettings[this.activeProfile].htmlExportFilePath=text.inputEl.value;
+				this.save();
 				console.log("==> New Input path");});
 		});}
+
+		/* //This toggle might not be needed as one can check if there is a file path string or not
 		filePathInput.addToggle((toggle) => {
 			toggle.setValue(this.profileSettings[this.activeProfile].exportFile);
 			toggle.onChange(async (value) => {
@@ -294,7 +297,7 @@ export class Markdown2HtmlSettingsTab extends PluginSettingTab {
 					console.log("==> File export is off");
 				}
 			});
-		});
+		});*/
 	
 			//Toggle for dirty export
 	new Setting(this.containerEl)
@@ -397,7 +400,8 @@ export class Markdown2HtmlSettingsTab extends PluginSettingTab {
 								exportFile: false,
 								exportClipboard: true,
 								exportFoundry: true,
-								internalLinkResolution: true,	
+								internalLinkResolution: true,
+								htmlExportFilePath:"",
 							};
 							
 							this.display
@@ -532,9 +536,9 @@ export class RuleEditorModal extends Modal {
 		container.createEl('h2').setText("Replacement Rules");
 		const tableHeader = container.createDiv();
 		//tableHeader.createSpan('table-header-Order').setText("Order");
-		tableHeader.createSpan('table-header-Rules').setText("Rules");
-		tableHeader.createSpan('table-header-Replacmente').setText("Replacment");
-		container.createEl('br');
+		//tableHeader.createSpan('table-header-Rules').setText("Rules");
+		//tableHeader.createSpan('table-header-Replacmente').setText("Replacment");
+		//container.createEl('br');
 
 		const inputNewRule = new Setting(container);
 		inputNewRule.addText(text => {
@@ -546,7 +550,7 @@ export class RuleEditorModal extends Modal {
 			text.inputEl.setAttribute("id", `newRule`);
 			text.inputEl.setAttribute("name", `newRule`);
 			let fieldValue = "";
-			//Seems I need to save the value on change else I get emtpy rules and  things go haywire
+			//Seems I need to save the value on change else I get empty rules and  things go haywire
 			text.inputEl.addEventListener("change", () => {fieldValue=text.inputEl.value;})
 			text.inputEl.addEventListener("keypress", (e: KeyboardEvent) => {
 				if (e.key === "Enter") {

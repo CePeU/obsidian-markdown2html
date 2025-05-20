@@ -71,13 +71,19 @@ function resolveInternalLinks(parent: HTMLElement, settings: Markdown2HtmlSettin
 	const activeFile = this.app.workspace.getActiveFile();
 	const links = parent.querySelectorAll('a.internal-link'); //get all internal links which are of tag type anker ==>a and match the class "internal-link"
 	links.forEach(link => {
-		const href = link.getAttribute('href');
-		if (href) {
-			console.log("href", href);
-			const targetFilePath = resolveWikilink(this.app, href, activeFile);
-			console.log("targetFilePath", targetFilePath);
-			if (targetFilePath) {
-				link.setAttribute('href', targetFilePath);
+		//IF  an anker is used the wikilink will be "SomeMDfile#SomeHeading"
+		//so get the first group, resolve the file path and then replace the first group in the original href with the resolved path
+		const href = link.getAttribute('href') as String;
+		const regexExpression = '^([^#]+)'; // regex to captures a group before # regardless if # is present or not
+		const hrefToResolve = href?.match(regexExpression)?.[0] ?? ""; // captures the group before # regardless if # is present or not
+
+		if (hrefToResolve) {
+			//console.log("href", hrefToResolve);
+			const targetFilePath = resolveWikilink(this.app, hrefToResolve, activeFile) ?? ""; // get full obsidian path for first regex group before the hash
+			const finalHref= href.replace(hrefToResolve,targetFilePath); // replace the first group token with the resolved file path
+			//console.log("targetFilePath final", finalHref);
+			if (finalHref) {
+				link.setAttribute('href', finalHref);
 			}
 		}
 	});
