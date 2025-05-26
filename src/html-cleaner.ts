@@ -28,33 +28,55 @@ if (file instanceof this.app.vault.TFile) {
 
 //https://www.perplexity.ai/search/how-can-i-resolve-an-internal-kxuveDFwS_Wsulk_dovZeA
 function resolveWikilink(app: App, linkText: string, sourceFile: TFile): string|null {
-    const targetFile = app.metadataCache.getFirstLinkpathDest(linkText, sourceFile.path);
-    return targetFile?.path || null;
+	const targetFile = app.metadataCache.getFirstLinkpathDest(linkText, sourceFile.path);
+	return targetFile?.path || null;
 }
 
 function replaceTag(parent: HTMLElement, settings: Markdown2HtmlSettings) {
 // function to query for html tags with querySelectorAll and replace the tags with other tags
 console.log("settings",settings.rulesArray)
 for (let i = 0; i < settings.rulesArray.length; i++) {
-	const singleRuleSet =settings.rulesArray[i];
+	const singleRuleSet = settings.rulesArray[i];
 const tagList = parent.querySelectorAll(singleRuleSet[0]) as NodeListOf<HTMLImageElement>;
 tagList.forEach(element => {
-	console.log("TAG element:", element)
+	//console.log("TAG element:", element)
+
 	//console.log("tagname", element.tagName)
 	//console.log("Tagx", element.attributes)
 	//console.log("Node Info1",element.nodeValue)
 	//console.log("Node Info2",element.nodeType)
 	//element.nodeType = 'section';
+	
+	const classesHTMLold = element.classList;
+	console.log("classesHTMLold", classesHTMLold)
+	//const attributesHTMLold = element.attributes;
+	//console.log("attributesHTMLold", attributesHTMLold)
 	const innerHTMLold = element.innerHTML
 	// The as is a cast. Make sure the cast is correct and valid or catch if it is invalid
-	if (isEmpty(singleRuleSet[1])){
+if (isEmpty(singleRuleSet[1])){
+	console.log("TAG Remove element:", element)
 		element.remove()
 	//const tag = element.get
 } else {
+	console.log("TAG Original element:", element)
 	const newElement = element.createEl(singleRuleSet[1] as keyof HTMLElementTagNameMap)
-	newElement.innerHTML= innerHTMLold
+	console.log("TAG New element:", newElement)
+	newElement.innerHTML= innerHTMLold;
+	element.getAttributeNames().forEach(attr => {
+		console.log("attr", attr)
+		if (element.hasAttribute(attr)) {
+			const attrValue = element.getAttribute(attr);
+			if (attrValue) {
+				newElement.setAttribute(attr, attrValue);
+				console.log("attrValue", attrValue);
+				console.log("newElement", newElement);
+			}
+		}
+	});
+	//newElement.classList.add(...classesHTMLold);
+	//newElement.addClasses = attributesHTMLold; // copy all attributes from the old element to the new element
 	element.replaceWith(newElement)
-	console.log("TAG element:", element)
+	console.log("TAG Reformed element:", element)
 	
 }
 	
@@ -70,6 +92,7 @@ text.replaceWith(em); // Replace `Some text` by `Italic text`*/
 function resolveInternalLinks(parent: HTMLElement, settings: Markdown2HtmlSettings) {
 	const activeFile = this.app.workspace.getActiveFile();
 	const links = parent.querySelectorAll('a.internal-link'); //get all internal links which are of tag type anker ==>a and match the class "internal-link"
+	//console.log("links", links);
 	links.forEach(link => {
 		//IF  an anker is used the wikilink will be "SomeMDfile#SomeHeading"
 		//so get the first group, resolve the file path and then replace the first group in the original href with the resolved path
@@ -79,7 +102,7 @@ function resolveInternalLinks(parent: HTMLElement, settings: Markdown2HtmlSettin
 
 		if (hrefToResolve) {
 			//console.log("href", hrefToResolve);
-			const targetFilePath = resolveWikilink(this.app, hrefToResolve, activeFile) ?? ""; // get full obsidian path for first regex group before the hash
+			const targetFilePath =resolveWikilink(this.app, hrefToResolve, activeFile) ?? ""; // get full obsidian path for first regex group before the hash
 			const finalHref= href.replace(hrefToResolve,targetFilePath); // replace the first group token with the resolved file path
 			//console.log("targetFilePath final", finalHref);
 			if (finalHref) {
@@ -96,15 +119,25 @@ export async function cleanHtml(parent: HTMLElement, settings: Markdown2HtmlSett
 	//console.log("Wikilink:", Wikilink);
 	//const Test = new TFile(parent.dataset.filepath);
 	//console.log("TFile", Test);
+	
 	replaceTag(parent,settings);
 	if (settings.internalLinkResolution) {
 		resolveInternalLinks(parent, settings);
 	}
+	//!TODO put clean or dirty here. This allows to use the resoultion of paths and pictures seperately
+	
 	removeEmptyContainer(parent);
+	if (settings.removeFrontmatter) {
+		// remove frontmatter header
 	removeFrontMatter(parent);
+	}
+	if(settings.exportDirty !== true) {
 	removeAttributes(parent, settings);
+	}
+	//!TODO add a setting to convert images or not
+	if (settings.encodePictures) {
 	await convertImages(parent);
-
+	}
 	const html = removeEmptyLines(parent.innerHTML);
 	return html;
 }

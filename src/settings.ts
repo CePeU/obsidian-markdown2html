@@ -19,6 +19,8 @@ export interface Markdown2HtmlSettings {
 	exportFoundry: boolean;
 	internalLinkResolution: boolean;
 	htmlExportFilePath:string;
+	encodePictures: boolean; // New setting for image encoding
+	removeFrontmatter: boolean; // New setting for removing frontmatter
 	
 }
 
@@ -39,6 +41,8 @@ export const DEFAULT_SETTINGS: ProfileSettings = {
 	exportFoundry: true,
 	internalLinkResolution: false,
 	htmlExportFilePath:"",
+	encodePictures: true, // Default value for image encoding
+	removeFrontmatter: true, // Default value for removing frontmatter
 	},
 };
 
@@ -274,6 +278,7 @@ export class Markdown2HtmlSettingsTab extends PluginSettingTab {
 		filePathInput.addText(text => {
 			text.inputEl.style.width = "100%";
 			text.setPlaceholder("Enter path...");
+			text.setValue(this.profileSettings[this.activeProfile].htmlExportFilePath);
 			
 			text.inputEl.addEventListener("change", () => {
 				this.profileSettings[this.activeProfile].htmlExportFilePath=text.inputEl.value;
@@ -302,7 +307,7 @@ export class Markdown2HtmlSettingsTab extends PluginSettingTab {
 			//Toggle for dirty export
 	new Setting(this.containerEl)
 	.setName("Dirty export")
-	.setDesc("Whether an unmodified export should take place. This will override all other markdown modifying settings.")
+	.setDesc("Whether an export should take place where classes and attributes are not removed. This will ignore class and attribute settings.")
 	.addToggle((toggle) => {
 		toggle.setValue(this.profileSettings[this.activeProfile].exportDirty);
 		toggle.onChange(async (value) => {
@@ -354,7 +359,43 @@ export class Markdown2HtmlSettingsTab extends PluginSettingTab {
 				});
 			});
 			
+			//Toggle for Image encoding
+			new Setting(this.containerEl)
+			.setName("Image encoding")
+			.setDesc("Whether images should be encoded as base64 in the HTML.")
+			.addToggle((toggle) => {
+				toggle.setValue(this.profileSettings[this.activeProfile].encodePictures);
+				toggle.onChange(async (value) => {
+					if (value) {
+						this.profileSettings[this.activeProfile].encodePictures = true;
+						this.save();
+						console.log("==> Foundry expport is on");
+					} else {
+						this.profileSettings[this.activeProfile].encodePictures = false;
+						this.save();
+						console.log("==> Foundry export is off");
+					}
+				});
+			});
 		
+		//Toggle for Frontmatter removing
+		new Setting(this.containerEl)
+		.setName("Remove frontmatter")
+		.setDesc("Whether frontmatter should be removed from the HTML.")
+		.addToggle((toggle) => {
+			toggle.setValue(this.profileSettings[this.activeProfile].removeFrontmatter);
+			toggle.onChange(async (value) => {
+				if (value) {
+					this.profileSettings[this.activeProfile].removeFrontmatter = true;
+					this.save();
+					console.log("==> Foundry expport is on");
+				} else {
+					this.profileSettings[this.activeProfile].removeFrontmatter = false;
+					this.save();
+					console.log("==> Foundry export is off");
+				}
+			});
+		});
 
 
 		} // End of display function
@@ -402,6 +443,9 @@ export class Markdown2HtmlSettingsTab extends PluginSettingTab {
 								exportFoundry: true,
 								internalLinkResolution: true,
 								htmlExportFilePath:"",
+								encodePictures: true, // Default value for image encoding
+								removeFrontmatter: true, // Default value for removing frontmatter
+							// Add default settings for the new profile
 							};
 							
 							this.display

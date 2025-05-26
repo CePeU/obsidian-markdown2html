@@ -139,14 +139,15 @@ export default class Markdown2Html extends Plugin {
 		async (settings: Markdown2HtmlSettings) => {
 			console.log("exportClipboard", settings.exportClipboard);
 			if (settings.exportClipboard) {
-				if(settings.exportDirty) {
+				//if(settings.exportDirty) {
 					// if the user wants to export the dirty HTML, we just copy the result
-				navigator.clipboard
-					.writeText(this.copyResult?.innerHTML ?? "")
-					.then(() => new Notice("Dirty HTML copied to the clipboard", 3500))
-					.catch(() => new Notice("Couldn't copy html to the clipboard", 3500))
-					.finally(() => this.endCopyProcess())
-				} else {
+					//!TODO move this to cleanhtml function
+				//navigator.clipboard
+				//	.writeText(this.copyResult?.innerHTML ?? "")
+				//	.then(() => new Notice("Dirty HTML copied to the clipboard", 3500))
+				//	.catch(() => new Notice("Couldn't copy html to the clipboard", 3500))
+				//	.finally(() => this.endCopyProcess())
+				//} else {
 					// if the user wants to export the clean HTML, we need to wait for the render to finish
 					this.copyInProgressModal.close();
 					const html = await cleanHtml(this.copyResult as HTMLElement, settings);
@@ -155,7 +156,12 @@ export default class Markdown2Html extends Plugin {
 						.then(() => new Notice("Cleaned HTML copied to the clipboard", 3500))
 						.catch(() => new Notice("Couldn't copy html to the clipboard", 3500))
 						.finally(() => this.endCopyProcess());
-				}
+				//}
+			}
+			// add another if statement that checks for html file export, if true export html variable to file
+			if (settings.htmlExportFilePath !==""){
+
+				console.log("File Path export code needs to be implemented", settings.htmlExportFilePath);
 			}
 		},
 		500, /* wait delay until copy to clipboard happens */
