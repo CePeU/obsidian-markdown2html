@@ -6,13 +6,26 @@ import { text } from "stream/consumers";
 import { debug, table } from "console";
 import { markAsUntransferable } from "worker_threads";
 import { validateHeaderName } from "http";
+import * as ct  from 'electron';
 
+
+
+//import { ipcRenderer } from 'electron';
+//
+//async function getWindowTitle() {
+//  const title = await ipcRenderer.invoke('get-window-title');
+//  console.log(title);
+//}
+
+/* @ts-ignore */
+const dialog: Electron.Dialog =require('electron'.remote.dialog); // for file picker
 
 export interface Markdown2HtmlSettings {
 	attributeList: string[];
 	classList: string[];
 	isActiveProfile: boolean;
 	rulesArray: string[][];
+	regexRules: string[][];
 	exportDirty: boolean;
 	exportFile: boolean;
 	exportClipboard: boolean;
@@ -35,6 +48,7 @@ export const DEFAULT_SETTINGS: ProfileSettings = {
 	classList: [],
 	isActiveProfile: true,
 	rulesArray: [["div", "p"]],
+	regexRules: [["",""]],
 	exportDirty: false,
 	exportFile: false,
 	exportClipboard: true,
@@ -47,6 +61,7 @@ export const DEFAULT_SETTINGS: ProfileSettings = {
 };
 
 //let _profileName :string = 'default';
+  
 
 export class Markdown2HtmlSettingsTab extends PluginSettingTab {
 	private plugin: Markdown2Html;
@@ -90,6 +105,8 @@ export class Markdown2HtmlSettingsTab extends PluginSettingTab {
 		//this.data=DEFAULT_SETTINGS['default']; == Improve by checking if active profile exists and else set default
 			return this.profiledata[this.activeProfile];	
 	}
+
+
 
 	display(): void {
 		const { containerEl } = this;
@@ -215,14 +232,14 @@ export class Markdown2HtmlSettingsTab extends PluginSettingTab {
 			);
 	
 	//Button for Modal and Class Mapping
-	new Setting(containerEl).setHeading().setName("Classes/Attributes for HTML tags");
+	new Setting(containerEl).setHeading().setName("HTML tag replacement");
 	new Setting(containerEl)
-			.setName("Add additional Classes/Attributes for HTML tags")
-			.setDesc(`This allows you to add Classes and Attributes to HTML tags during export. The rules set up here run as a last step in the export.`)
+			.setName("HTML tag replacemnt")
+			.setDesc(`This allows you to set up rules to replace HTML tags during export. The rules set up here run as the first step in the export.`)
 			.addButton(button =>
 				button
 					.setIcon("list-plus")
-					.setTooltip("Add classes according to rules")
+					.setTooltip("Add tag replacement rules")
 					.onClick(() => {
 						//new RulesModal(this.app).open();
 						//new RulesModal(this.app).open();
@@ -240,13 +257,54 @@ export class Markdown2HtmlSettingsTab extends PluginSettingTab {
 
 							//console.log("==> Updated Rules Array",this.profileSettings[this.activeProfile].rulesArray);
 
-						});
+						},"The first column holds the rule how to find the DOM element (div or div.classname). The second column holds the new element name (for example 'span' or 'paragraph').");
 						modal.open();
 						/*const modal = new MapEditorModal2(this.app, sampleMap);
 						console.log("==> New Modal and code to implement",);*/
 						
 					})
 			);
+
+			new Setting(containerEl).setHeading().setName("Regex replacement rules");
+			new Setting(containerEl)
+					.setName("Regex replacement rules")
+					.setDesc(`This allows you to add regex rules. The rules set up here run as a second step in the export.`)
+					.addButton(button =>
+						button
+							.setIcon("list-plus")
+							.setTooltip("Add regex rules")
+							.onClick(() => {
+								//new RulesModal(this.app).open();
+								//new RulesModal(this.app).open();
+								let arrayForModal: string[][] = this.profileSettings[this.activeProfile].regexRules;
+								console.log("arrayForModal",arrayForModal)
+								if (arrayForModal === undefined) {
+									console.log("I was here");
+									arrayForModal = this.data.regexRules;
+								}
+								console.log("==> Rules Array for modal",arrayForModal);					
+								// Create and show modal
+								//const modal = new MapEditorModal(this.app, sampleMap, (updatedMap) => {
+								//	console.log('Updated map:', updatedMap);
+								//});
+								const modal = new RuleEditorModal(this.app, arrayForModal, (updatedRulesArray) => {
+									console.log('Updated rules Array:', updatedRulesArray);
+									this.profileSettings[this.activeProfile].regexRules = updatedRulesArray;
+									this.save();
+									this.display();
+		
+									//console.log("==> Updated Rules Array",this.profileSettings[this.activeProfile].rulesArray);
+		
+								},
+								"The first column is your regex expression. You need to enter it with global flags like /gm (so 'regexPattern/gm'). The second column holds the replacement string."
+							);
+								modal.open();
+								/*const modal = new MapEditorModal2(this.app, sampleMap);
+								console.log("==> New Modal and code to implement",);*/
+								
+							})
+					);
+
 
 
 		//Toggle for clippboard export
@@ -397,6 +455,48 @@ export class Markdown2HtmlSettingsTab extends PluginSettingTab {
 			});
 		});
 
+	new Setting(containerEl).setHeading().setName("TEST");
+	new Setting(containerEl)
+			.setName("TESTname")
+			.setDesc(`Testdesc`)
+			.addButton(button =>
+				button
+					.setIcon("document")
+					.setTooltip("Add tag replacement rules")
+					.onClick(() => {
+					
+						//new RulesModal(this.app).open();
+						//new RulesModal(this.app).open();
+						//const arrayForModal: string[][] = this.profileSettings[this.activeProfile].rulesArray;
+						//console.log("==> Rules Array",arrayForModal);					
+						// Create and show modal
+						//const modal = new MapEditorModal(this.app, sampleMap, (updatedMap) => {
+						//	console.log('Updated map:', updatedMap);
+						//});
+						/*const modal = new RuleEditorModal(this.app, arrayForModal, (updatedRulesArray) => {
+							console.log('Updated rules Array:', updatedRulesArray);
+							this.profileSettings[this.activeProfile].rulesArray = updatedRulesArray;
+							this.save();
+							this.display();
+
+							//console.log("==> Updated Rules Array",this.profileSettings[this.activeProfile].rulesArray);
+
+						});*/
+						/*ct.ipcMain.handle('show-open-dialog', async (event, options) => {
+							const result = await ct.dialog.showOpenDialog(options);
+							return result;
+						});*/
+						//openFileDialog();
+						//selectFolder();
+						//console.log(getWindowTitle());
+						//const test = ct.ipcMain;
+//console.log(test.dialog.showOpenDialog({ properties: ['openFile', 'multiSelections'] }))
+						 // console.log("Value of FileSelector",chooseFolder())
+						/*const modal = new MapEditorModal2(this.app, sampleMap);
+						console.log("==> New Modal and code to implement",);*/
+						
+					})
+			);
 
 		} // End of display function
 
@@ -437,6 +537,7 @@ export class Markdown2HtmlSettingsTab extends PluginSettingTab {
 								classList: [],
 								isActiveProfile: false,
 								rulesArray:[["", ""]],
+								regexRules:[["", ""]],
 								exportDirty: false,
 								exportFile: false,
 								exportClipboard: true,
@@ -549,11 +650,13 @@ export class Markdown2HtmlSettingsTab extends PluginSettingTab {
 export class RuleEditorModal extends Modal {
 	private _rulesData: string[][];
 	private onSave?: (newRulesData: string[][]) => void;
+	private _inputInfo: string;
 
-	constructor(app: App, rulesData: string[][], onSave?: (newRulesData: string[][]) => void) {
+	constructor(app: App, rulesData: string[][], onSave?: (newRulesData: string[][]) => void,inputInfo?: string) {
 		super(app);
 		this._rulesData = rulesData;
 		this.onSave = onSave;
+		this._inputInfo = inputInfo ?? "";
 	}
 	get rulesData(): string[][] {
 		return this._rulesData;
@@ -578,7 +681,8 @@ export class RuleEditorModal extends Modal {
 
 		const container = contentEl.createDiv();
 		container.createEl('h2').setText("Replacement Rules");
-		const tableHeader = container.createDiv();
+		const inputHelp = container.createDiv();
+		inputHelp.createSpan().setText(this._inputInfo);
 		//tableHeader.createSpan('table-header-Order').setText("Order");
 		//tableHeader.createSpan('table-header-Rules').setText("Rules");
 		//tableHeader.createSpan('table-header-Replacmente').setText("Replacment");
@@ -598,7 +702,8 @@ export class RuleEditorModal extends Modal {
 			text.inputEl.addEventListener("change", () => {fieldValue=text.inputEl.value;})
 			text.inputEl.addEventListener("keypress", (e: KeyboardEvent) => {
 				if (e.key === "Enter") {
-					this.rulesData.push([fieldValue,""]);
+					this.rulesData.push([text.inputEl.value,""]);
+					this.onSave?.(this.rulesData); //New MONDAY callback to save the rulesData
 					console.log("==> New Rule Value",text.inputEl.value);
 					this.display();
 					const newInputEl = document.getElementById("newRule") as HTMLInputElement;
@@ -667,6 +772,7 @@ SingleElement.addText(text => {
 		// Check if the currentRuleValue is not empty
 		if (text.inputEl.value === "") {
 			// If the currentRuleValue is empty, remove the rule from the rulesData array
+			console.log("==> Removing rule at index", indexNumber);
 			this.rulesData.splice(indexNumber, 1);
 			this.display();
 		} else if (currentRuleValue) {
@@ -680,9 +786,10 @@ SingleElement.addText(text => {
 		if (this.onSave) { //Check if this makes sense and how callback works
 			this.onSave(this._rulesData);
 		}
+		//this.onSave?(this._rulesData):undefined; //New MONDAY callback to save the rulesData
 	text.inputEl.addEventListener("keypress", (e: KeyboardEvent) => {
 		if (e.key === "Enter") {
-			console.log("==> Enter");
+			console.log("==> Enter in Fieldlist");
 		}
 	});
 });
@@ -850,4 +957,5 @@ console.log("==> New Rule Data",this._rulesData[indexNumber][0]);
 		const { contentEl } = this;
 		contentEl.empty();
 	}
+
 }

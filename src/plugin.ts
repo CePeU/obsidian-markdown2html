@@ -10,8 +10,11 @@ import {
 	Notice,
 	Plugin,
 	setIcon,
+	TFile,
+	normalizePath,
 } from "obsidian";
 import { Markdown2HtmlSettings, Markdown2HtmlSettingsTab as Markdown2HtmlSettingsTab } from "./settings";
+import { FileSystemAdapter } from 'obsidian';
 
 export default class Markdown2Html extends Plugin {
 	private copyInProgressModal: Modal;
@@ -138,6 +141,7 @@ export default class Markdown2Html extends Plugin {
 	private copyHtmlToClipboard = debounce(
 		async (settings: Markdown2HtmlSettings) => {
 			console.log("exportClipboard", settings.exportClipboard);
+			let html="";
 			if (settings.exportClipboard) {
 				//if(settings.exportDirty) {
 					// if the user wants to export the dirty HTML, we just copy the result
@@ -150,7 +154,7 @@ export default class Markdown2Html extends Plugin {
 				//} else {
 					// if the user wants to export the clean HTML, we need to wait for the render to finish
 					this.copyInProgressModal.close();
-					const html = await cleanHtml(this.copyResult as HTMLElement, settings);
+					html = await cleanHtml(this.copyResult as HTMLElement, settings);
 					navigator.clipboard
 						.writeText(html)
 						.then(() => new Notice("Cleaned HTML copied to the clipboard", 3500))
@@ -162,6 +166,38 @@ export default class Markdown2Html extends Plugin {
 			if (settings.htmlExportFilePath !==""){
 
 				console.log("File Path export code needs to be implemented", settings.htmlExportFilePath);
+				//save html to file
+				
+				let vaultPath="";
+				
+				const adapter = this.app.vault.adapter;
+				if (adapter instanceof FileSystemAdapter) {
+				  vaultPath = adapter.getBasePath();
+				  console.log("Vault absolute path:", vaultPath);
+				}
+				
+					// Content to save
+					const content = html;
+				
+					// File path within the vault
+					const filePath = normalizePath("my-note.html");
+				
+					// Check if file exists
+					const existingFile = this.app.vault.getAbstractFileByPath(filePath);
+				
+					if (existingFile instanceof TFile) {
+					  // If file exists, modify it
+					  await this.app.vault.modify(existingFile, content);
+					} else {
+					  // If file doesn't exist, create it
+					  await this.app.vault.create(filePath, content);
+					}
+				
+					console.log(`Content saved to ${filePath}`);
+				
+				
+				
+				//end of code
 			}
 		},
 		500, /* wait delay until copy to clipboard happens */

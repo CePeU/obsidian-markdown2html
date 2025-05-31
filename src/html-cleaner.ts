@@ -1,6 +1,7 @@
 import { Markdown2HtmlSettings } from "./settings";
 import { isEmpty, removeEmptyLines } from "./utils";
-import { App, TFile } from 'obsidian'
+import { App, TFile,normalizePath, parseFrontMatterEntry } from 'obsidian';
+import { FileSystemAdapter } from 'obsidian';
 
 
 /**
@@ -37,7 +38,9 @@ function replaceTag(parent: HTMLElement, settings: Markdown2HtmlSettings) {
 console.log("settings",settings.rulesArray)
 for (let i = 0; i < settings.rulesArray.length; i++) {
 	const singleRuleSet = settings.rulesArray[i];
+	if (singleRuleSet[0]){
 const tagList = parent.querySelectorAll(singleRuleSet[0]) as NodeListOf<HTMLImageElement>;
+if (tagList){
 tagList.forEach(element => {
 	//console.log("TAG element:", element)
 
@@ -48,19 +51,19 @@ tagList.forEach(element => {
 	//element.nodeType = 'section';
 	
 	const classesHTMLold = element.classList;
-	console.log("classesHTMLold", classesHTMLold)
+	//console.log("classesHTMLold", classesHTMLold)
 	//const attributesHTMLold = element.attributes;
 	//console.log("attributesHTMLold", attributesHTMLold)
 	const innerHTMLold = element.innerHTML
 	// The as is a cast. Make sure the cast is correct and valid or catch if it is invalid
 if (isEmpty(singleRuleSet[1])){
-	console.log("TAG Remove element:", element)
+	//console.log("TAG Remove element:", element)
 		element.remove()
 	//const tag = element.get
 } else {
-	console.log("TAG Original element:", element)
+	//console.log("TAG Original element:", element)
 	const newElement = element.createEl(singleRuleSet[1] as keyof HTMLElementTagNameMap)
-	console.log("TAG New element:", newElement)
+	//console.log("TAG New element:", newElement)
 	newElement.innerHTML= innerHTMLold;
 	element.getAttributeNames().forEach(attr => {
 		console.log("attr", attr)
@@ -68,19 +71,20 @@ if (isEmpty(singleRuleSet[1])){
 			const attrValue = element.getAttribute(attr);
 			if (attrValue) {
 				newElement.setAttribute(attr, attrValue);
-				console.log("attrValue", attrValue);
-				console.log("newElement", newElement);
+				//console.log("attrValue", attrValue);
+				//console.log("newElement", newElement);
 			}
 		}
 	});
 	//newElement.classList.add(...classesHTMLold);
 	//newElement.addClasses = attributesHTMLold; // copy all attributes from the old element to the new element
 	element.replaceWith(newElement)
-	console.log("TAG Reformed element:", element)
+	//console.log("TAG Reformed element:", element)
 	
 }
 	
 });
+}}
 }}
 
 /*let text = document.getElementById("myText").firstChild;
@@ -120,10 +124,20 @@ export async function cleanHtml(parent: HTMLElement, settings: Markdown2HtmlSett
 	//const Test = new TFile(parent.dataset.filepath);
 	//console.log("TFile", Test);
 	
+	if (settings.rulesArray) {
 	replaceTag(parent,settings);
+	}
+
+	
+	//if (settings.regexRules) {
+	console.log("==== PARENT zu beginn ====",parent)	
+	replaceWithRegex(parent,settings);
+	//}
+
 	if (settings.internalLinkResolution) {
 		resolveInternalLinks(parent, settings);
 	}
+
 	//!TODO put clean or dirty here. This allows to use the resoultion of paths and pictures seperately
 	
 	removeEmptyContainer(parent);
@@ -139,6 +153,8 @@ export async function cleanHtml(parent: HTMLElement, settings: Markdown2HtmlSett
 	await convertImages(parent);
 	}
 	const html = removeEmptyLines(parent.innerHTML);
+
+
 	return html;
 }
 
@@ -209,3 +225,83 @@ async function toBase64(src: string) {
 		)
 		.then(fr => fr.result as string);
 }
+
+function replaceWithRegex2(parent: HTMLElement, settings: Markdown2HtmlSettings) {
+	// function to regex replace content of the HTML
+	// Serialize and deserialize have been choosen in the case that the frontmatter needs to be replaced on the first step
+	// else an approach with parsing all hmtl nodes and replace in .outerHTML would probably be better
+	console.log("Regex Rules",settings.regexRules)
+	//const serializer = new XMLSerializer();
+	//const htmlString: string = serializer.serializeToString(parent); // Serialize the HTMLelement to string 
+
+	const htmlString: string =parent.outerHTML;
+	let replacedHtmlString: string ="";
+	for (let i = 0; i < settings.regexRules.length; i++) {
+		const singleRuleSet = settings.regexRules[i];
+		if (singleRuleSet[0]){
+			
+
+			const regexPattern = singleRuleSet[0];
+			const replacementString = singleRuleSet[1];
+		
+			replacedHtmlString = htmlString.replace(regexPattern, replacementString);
+		}
+		
+		//const test = parent.outerHTML
+	//	const parser = new DOMParser();
+	console.log("=================",replacedHtmlString)
+		//parent.setHTMLUnsafe(replacedHtmlString);
+		//parent =	parser.parseFromString(replacedHtmlString, 'text/html'));
+	//ode.
+	//		parent = createEl.
+	
+		
+	};
+	}
+	
+	function replaceWithRegex(parent: HTMLElement, settings: Markdown2HtmlSettings) {
+		// function to regex replace content of the HTML
+		// Serialize and deserialize have been choosen in the case that the frontmatter needs to be replaced on the first step
+		// else an approach with parsing all hmtl nodes and replace in .outerHTML would probably be better
+		console.log("Regex Rules",settings.regexRules)
+		const serializer = new XMLSerializer();
+		const htmlString: string = serializer.serializeToString(parent); // Serialize the HTMLelement to string 
+		console.log("===HTML STRING ====", htmlString)
+		//const htmlString: string =parent.outerHTML;
+		let replacedHtmlString: string ="";
+		for (let i = 0; i < settings.regexRules.length; i++) {
+			const singleRuleSet = settings.regexRules[i];
+			console.log("single ruleset",singleRuleSet);
+			if (singleRuleSet[0]){
+				
+				const { regexPattern, regexFlags } = parseRegexPattern(singleRuleSet[0]);
+				//const regexPattern = new RegExp(singleRuleSet[0],"gm");
+				const regex = new RegExp(regexPattern,regexFlags);
+				const replacementString = singleRuleSet[1];
+			console.log("Regex:",regexPattern);
+			console.log("Replacement", replacementString);
+			console.log("Array index 1",singleRuleSet[1]);
+				replacedHtmlString = htmlString.replace(regex, replacementString);
+			}
+			
+			//const test = parent.outerHTML
+		//	const parser = new DOMParser();
+		console.log("=================",replacedHtmlString)
+			//parent.setHTMLUnsafe(replacedHtmlString);
+			//parent =	parser.parseFromString(replacedHtmlString, 'text/html'));
+		//ode.
+		//		parent = createEl.
+		
+			
+		};
+		}
+
+		function parseRegexPattern(input: string): { regexPattern: string; regexFlags: string } {
+			const match = input.match(/^\/?(.*?)(?:\/([gimsuy]*))?$/);
+			if (!match) throw new Error("Invalid regex input");
+		
+			return {
+				regexPattern: match[1],
+				regexFlags: match[2] || ""
+			};
+		}
